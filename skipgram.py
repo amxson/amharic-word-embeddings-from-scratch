@@ -1,5 +1,7 @@
+import json
 import math
 import random
+from pathlib import Path
 
 
 def initialize_parameters(vocabulary_size, dimension, seed):
@@ -98,3 +100,46 @@ def train(E, U, pairs, learning_rate, epochs, seed, verbose=True):
         print(f"Final mean loss: {history[-1]:.6f}")
         print(f"Loss decrease: {decrease:.2f}%")
     return history
+
+
+def train_fresh_model(vocabulary_size, dimension, pairs, learning_rate, epochs, seed, verbose=False):
+    E, U = initialize_parameters(vocabulary_size, dimension, seed)
+    history = train(E, U, pairs, learning_rate, epochs, seed, verbose)
+    return E, U, history
+
+
+def cosine_similarity(vector_a, vector_b):
+    dot = sum(a * b for a, b in zip(vector_a, vector_b))
+    norm_a = math.sqrt(sum(value * value for value in vector_a))
+    norm_b = math.sqrt(sum(value * value for value in vector_b))
+    if norm_a == 0.0 or norm_b == 0.0:
+        return 0.0
+    return dot / (norm_a * norm_b)
+
+
+def nearest_neighbors(query, E, word_to_id, id_to_word, top_n=3):
+    if query not in word_to_id:
+        return []
+    query_id = word_to_id[query]
+    scored = []
+    for word_id, word in enumerate(id_to_word):
+        if word_id != query_id:
+            scored.append((word, cosine_similarity(E[query_id], E[word_id])))
+    scored.sort(key=lambda item: (-item[1], item[0]))
+    return scored[:top_n]
+
+
+def prediction_probabilities(E, U, center_id):
+    h = E[center_id]
+    scores = [sum(h[k] * U[k][j] for k in range(len(h))) for j in range(len(U[0]))]
+    return stable_softmax_and_loss(scores, 0)[0]
+
+
+def save_model(path, vocabulary, E, U, settings):
+    payload = {"vocabulary": vocabulary, "E": E, "U": U, "settings": settings}
+    Path(path).write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
+def load_model(path):
+    payload = json.loads(Path(path).read_text(encoding="utf-8"))
+    return payload["vocabulary"], payload["E"], payload["U"], payload["settings"]
