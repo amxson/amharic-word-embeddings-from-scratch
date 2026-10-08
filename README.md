@@ -10,7 +10,7 @@ Word embeddings represent words as dense vectors that can be compared or used as
 data.py       corpus loading, preprocessing, vocabulary, and training pairs
 skipgram.py   full-softmax model, manual gradients, SGD, similarity, and JSON persistence
 validation.py assignment checks, numerical verification, and reproducibility
-main.py       minimal assignment entry point and checks-only mode
+main.py       complete assignment workflow and checks-only mode
 corpus.txt    one Amharic sentence per line
 ```
 
@@ -75,6 +75,25 @@ With the committed corpus and settings, mean loss decreases from `5.298295` to `
 | `ገበሬ` | `ስንዴ`, `በዝናብ`, `ይሠራል` |
 | `ዝናብ` | `ያቀርባል`, `ይረጥባል`, `መሬት` |
 
+## Model persistence and controlled experiment
+
+After training, the normal run saves the real Amharic vocabulary, `E`, `U`, and settings to `model.json`. It reloads the model and verifies exact vocabulary/settings equality, prediction probabilities within tolerance `0.00001`, and identical nearest-neighbor ordering. The small synthetic round-trip check also remains part of validation.
+
+The normal run then changes only context window 2 to window 1. Corpus, preprocessing, vocabulary, dimension, learning rate, epochs, and seed stay fixed. A fresh comparison model is trained with the same initialization settings.
+
+| Window | Directed pairs | Final mean loss |
+|---:|---:|---:|
+| 2 | 754 | 2.616722 |
+| 1 | 462 | 3.358973 |
+
+| Query | Window 2 neighbors | Window 1 neighbors |
+|---|---|---|
+| `ተማሪ` | `በየቀኑ`, `ይጠይቃል`, `ቃላትን` | `ይጠይቃል`, `ያጠናል`, `አስተማሪ` |
+| `ቡና` | `ትቀርባለች`, `ሻይ`, `ትፈላለች` | `ትፈላለች`, `ሻይ`, `ያሳድጋል` |
+| `ገበሬ` | `ስንዴ`, `በዝናብ`, `ይሠራል` | `ይዘራል`, `በዝናብ`, `ይሰበስባል` |
+
+These losses average different pair datasets. The smaller value alone does not prove that one context window is universally better; the neighbor comparison shows how changing local context changes the learned representation.
+
 ## Run
 
 Python 3.8 or newer is sufficient; there are no external dependencies.
@@ -84,7 +103,7 @@ python main.py
 python main.py --checks
 ```
 
-`python main.py` runs the complete assignment flow and exits after the five neighbor examples. `python main.py --checks` runs validation and exits without training the final model. JSON save/load helpers remain in `skipgram.py`; validation verifies a temporary model's vocabulary, probabilities, and neighbor order. Generated `model.json` files are ignored by Git.
+`python main.py` runs validation, training, five neighbor queries, real-model JSON save/reload verification, and the controlled context-window experiment. `python main.py --checks` runs the validation suite only, including shift invariance, synthetic save/reload, numerical gradients, reproducibility, fixed-weight evaluation, and unknown/zero-norm safety. Training settings are edited through the constants in `main.py`; no other run modes are needed. Generated `model.json` files are ignored by Git.
 
 ## Limitations
 
