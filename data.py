@@ -1,11 +1,8 @@
-"""Sentence-aware Amharic corpus preparation for skip-gram training."""
-
 import unicodedata
 from pathlib import Path
 
 
 def preprocess_sentence(text):
-    """Normalize conservatively, remove punctuation, and retain word tokens."""
     normalized = unicodedata.normalize("NFC", text.strip())
     separated = []
     for character in normalized:
@@ -19,20 +16,17 @@ def preprocess_sentence(text):
 
 
 def load_corpus(path):
-    """Load one sentence per nonempty line, preserving sentence boundaries."""
     lines = Path(path).read_text(encoding="utf-8").splitlines()
     return [tokens for line in lines if (tokens := preprocess_sentence(line))]
 
 
 def build_vocabulary(sentences):
-    """Build deterministic IDs by sorting every distinct token."""
     id_to_word = sorted({word for sentence in sentences for word in sentence})
     word_to_id = {word: index for index, word in enumerate(id_to_word)}
     return word_to_id, id_to_word
 
 
 def create_training_pairs(sentences, word_to_id, window_size):
-    """Create directed center-context pairs without crossing sentences."""
     pairs = []
     for sentence in sentences:
         ids = [word_to_id[word] for word in sentence]

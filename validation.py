@@ -2,11 +2,13 @@ import math
 import tempfile
 from pathlib import Path
 
-from data import build_vocabulary, create_training_pairs
+from data import create_training_pairs
 from skipgram import (
     compute_gradients,
     cosine_similarity,
+    dataset_loss,
     forward,
+    initialize_parameters,
     load_model,
     nearest_neighbors,
     prediction_probabilities,
@@ -66,7 +68,9 @@ def mandatory_checks():
     train_pair(updated_E, updated_U, 0, 1, 0.1)
     _, _, _, updated_loss = forward(updated_E, updated_U, 0, 1)
     unchanged = updated_E[1:] == E[1:]
+    expected_updated_U = [[-0.0244728, 1.0334759, -1.0090031], [1.0, 0.0, 1.0]]
     update_ok = vector_close(updated_E[0], [1.042479, -0.033476]) and close(updated_loss, 0.361859) and unchanged
+    update_ok = update_ok and matrix_close(updated_U, expected_updated_U)
     results.append(report(update_ok, "5 one update", f"E[cats]={[round(x, 6) for x in updated_E[0]]}, L={updated_loss:.6f}"))
 
     extreme_probabilities, extreme_loss = stable_softmax_and_loss([1000.0, 0.0], 1)
@@ -132,13 +136,25 @@ def robustness_checks():
     ]
 
 
+def fixed_weight_loss_check():
+    E = [[1.0, 0.0], [0.0, 1.0], [1.0, 1.0]]
+    U = [[0.0, 1.0, -1.0], [1.0, 0.0, 1.0]]
+    original_E, original_U = [row[:] for row in E], [row[:] for row in U]
+    pairs = [(0, 1), (1, 0)]
+    loss = dataset_loss(E, U, pairs)
+    repeated_loss = dataset_loss(E, U, pairs)
+    expected = sum(forward(original_E, original_U, i, t)[3] for i, t in pairs) / len(pairs)
+    passed = E == original_E and U == original_U and loss == repeated_loss and close(loss, expected)
+    return report(passed, "fixed-weight dataset loss", "repeated evaluation leaves E and U unchanged")
+
+
 def save_reload_check():
     vocabulary = ["a", "b", "c"]
     word_to_id = {word: index for index, word in enumerate(vocabulary)}
     E = [[1.0, 0.0], [0.0, 1.0], [1.0, 1.0]]
     U = [[0.0, 1.0, -1.0], [1.0, 0.0, 1.0]]
     settings = {"dimension": 2, "seed": 7}
-    with tempfile.TemporaryDirectory() as directory:
+    with tempfile.TemporaryDirectory(prefix=".verification-", dir=Path(__file__).resolve().parent) as directory:
         path = Path(directory) / "model.json"
         save_model(path, vocabulary, E, U, settings)
         loaded_vocabulary, loaded_E, loaded_U, loaded_settings = load_model(path)
@@ -151,13 +167,15 @@ def save_reload_check():
 
 def reproducibility_check(sentences, word_to_id, id_to_word, pairs):
     arguments = (len(id_to_word), 4, pairs, 0.03, 2, 2026)
+    initial1 = initialize_parameters(len(id_to_word), 4, 2026)
+    initial2 = initialize_parameters(len(id_to_word), 4, 2026)
     E1, U1, history1 = train_fresh_model(*arguments)
     E2, U2, history2 = train_fresh_model(*arguments)
     queries = [word for word in ["ተማሪ", "ቡና", "ገበሬ"] if word in word_to_id]
     orders1 = [nearest_neighbors(word, E1, word_to_id, id_to_word) for word in queries]
     orders2 = [nearest_neighbors(word, E2, word_to_id, id_to_word) for word in queries]
-    passed = E1 == E2 and U1 == U2 and history1 == history2 and orders1 == orders2
-    return report(passed, "reproducibility", "same seed/configuration produced identical losses, parameters, and neighbors")
+    passed = initial1 == initial2 and E1 == E2 and U1 == U2 and history1 == history2 and orders1 == orders2
+    return report(passed, "reproducibility", "same seed/configuration produced identical initialization, losses, parameters, and neighbors")
 
 
 def verify_save_reload(path, vocabulary, E, U, settings, query):
@@ -178,6 +196,7 @@ def run_checks(sentences, word_to_id, id_to_word, pairs):
     gradient_ok, _ = numerical_gradient_check()
     passed = gradient_ok and passed
     passed = all(robustness_checks()) and passed
+    passed = fixed_weight_loss_check() and passed
     passed = save_reload_check() and passed
     passed = reproducibility_check(sentences, word_to_id, id_to_word, pairs) and passed
     return passed
