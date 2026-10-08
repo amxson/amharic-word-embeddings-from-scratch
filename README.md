@@ -10,7 +10,7 @@ Word embeddings represent words as dense vectors that can be compared or used as
 data.py       corpus loading, preprocessing, vocabulary, and training pairs
 skipgram.py   full-softmax model, manual gradients, SGD, similarity, and JSON persistence
 validation.py assignment checks, numerical verification, and reproducibility
-main.py       command-line training, analysis, experiment, and interactive queries
+main.py       minimal assignment entry point and checks-only mode
 corpus.txt    one Amharic sentence per line
 ```
 
@@ -61,7 +61,7 @@ Both gradients are computed from the old forward-pass weights before either matr
 
 ## Training and interpretation
 
-The default configuration uses seed `2026`, window `2`, dimension `12`, learning rate `0.05`, and `30` epochs. The program prints corpus and model statistics, initial fixed-weight loss, loss after every epoch, final loss, and percentage reduction. It reports three nearest neighbors for five Amharic query words using manually implemented cosine similarity.
+The configuration constants near the top of `main.py` use seed `2026`, window `2`, dimension `12`, learning rate `0.05`, and `30` epochs. Change those constants directly to adjust training. The program prints corpus and model statistics, initial fixed-weight loss, loss after every epoch, final loss, and percentage reduction. It reports three nearest neighbors for five Amharic query words using manually implemented cosine similarity.
 
 Both matrices start with small uniform random values in `[-0.5/d, 0.5/d]`. The 12-dimensional model has only `2Vd = 4,800` parameters; this keeps full softmax practical. The learning rate and 30 epochs give a stable decreasing loss curve and observable contextual relationships without a large search framework. Cosine similarity uses rows of `E`, excludes the query itself, and returns zero safely for a zero-norm vector.
 
@@ -75,16 +75,6 @@ With the committed corpus and settings, mean loss decreases from `5.298295` to `
 | `ገበሬ` | `ስንዴ`, `በዝናብ`, `ይሠራል` |
 | `ዝናብ` | `ያቀርባል`, `ይረጥባል`, `መሬት` |
 
-`--show-evolution` compares the actual random initial embeddings with the trained embeddings. Random initial neighbors have no semantic meaning. A controlled experiment changes only context window while holding the corpus, preprocessing, seed, dimension, learning rate, and epochs fixed. Because each window creates a different pair dataset, their losses are descriptive rather than directly comparable proof that one window is universally better.
-
-| Query | Random initial neighbors | Trained neighbors |
-|---|---|---|
-| `ተማሪ` | `ጥሩ`, `አሉት`, `ናት` | `በየቀኑ`, `ይጠይቃል`, `ቃላትን` |
-| `ቡና` | `ታሪክ`, `በትብብር`, `ለእርሻ` | `ትቀርባለች`, `ሻይ`, `ትፈላለች` |
-| `ዝናብ` | `ጋር`, `ጥያቄ`, `በመሬት` | `ያቀርባል`, `ይረጥባል`, `መሬት` |
-
-The controlled run gives final loss `2.616722` for window 2 (754 pairs) and `3.358973` for window 1 (462 pairs). For example, the window-1 neighbors of `ተማሪ` are `ይጠይቃል`, `ያጠናል`, and `አስተማሪ`, while window 2 includes the somewhat broader contexts shown above.
-
 ## Run
 
 Python 3.8 or newer is sufficient; there are no external dependencies.
@@ -92,13 +82,9 @@ Python 3.8 or newer is sufficient; there are no external dependencies.
 ```bash
 python main.py
 python main.py --checks
-python main.py --check-data
-python main.py --show-evolution --no-interactive
-python main.py --load-model model.json
-python main.py --help
 ```
 
-Training writes vocabulary, `E`, `U`, and settings to `model.json`, then reloads it to check prediction probabilities and neighbor order. The generated model is reproducible and ignored by Git. At the interactive prompt, type an Amharic word such as `ቡና`, or `q` to quit; unknown words return a clear message.
+`python main.py` runs the complete assignment flow and exits after the five neighbor examples. `python main.py --checks` runs validation and exits without training the final model. JSON save/load helpers remain in `skipgram.py`; validation verifies a temporary model's vocabulary, probabilities, and neighbor order. Generated `model.json` files are ignored by Git.
 
 ## Limitations
 
